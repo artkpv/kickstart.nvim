@@ -74,6 +74,8 @@ vim.opt.cursorline = true
 -- Minimal number of screen lines to keep above and below the cursor.
 vim.opt.scrolloff = 10
 
+vim.opt.wrap = true
+
 -- disable netrw at the very start of your init.lua -- Required by nvim-tree.lua
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
@@ -1014,7 +1016,7 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>m\\', '<cmd>WikiToc<CR>')
       vim.keymap.set({ 'n', 'v' }, '<leader>mi', "<cmd>'<,'>HeaderIncrease<CR>")
       vim.keymap.set({ 'n', 'v' }, '<leader>md', "<cmd>'<,'>HeaderDecrease<CR>")
-      vim.keymap.set({ 'n', 'v' }, '<leader>mh', '<cmd>norm I# <CR>')
+      vim.keymap.set({ 'n', 'v' }, '<leader>mh', '<cmd>norm I#<CR>')
 
       vim.keymap.set('n', '<leader>mf', function()
         vim.cmd ':!firefox --new-window "%"&'
@@ -1027,20 +1029,27 @@ require('lazy').setup({
     dependencies = { 'nvim-treesitter/nvim-treesitter', 'echasnovski/mini.nvim' }, -- if you use the mini.nvim suite
     ---@module 'render-markdown'
     ---@type render.md.UserConfig
-    opts = {},
+    opts = {
+
+      latex = {
+        -- Whether LaTeX should be rendered, mainly used for health check
+        enabled = false,
+      },
+    },
   },
-  -- {
-  --   'jalvesaq/zotcite',
-  --   dependencies = {
-  --     'nvim-treesitter/nvim-treesitter',
-  --     'nvim-telescope/telescope.nvim',
-  --   },
-  --   config = function()
-  --     require('zotcite').setup {
-  --       -- your options here (see doc/zotcite.txt)
-  --     }
-  --   end,
-  -- },
+  {
+    'jalvesaq/zotcite',
+    -- branch = 'check_ft',
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter',
+      'nvim-telescope/telescope.nvim',
+    },
+    config = function()
+      require('zotcite').setup {
+        -- your options here (see doc/zotcite.txt)
+      }
+    end,
+  },
   {
     'stevearc/aerial.nvim',
     opts = {},
@@ -1169,10 +1178,77 @@ require('lazy').setup({
     opts = {
       -- add options here
       -- or leave it empty to use the default settings
+      --
+      dir_path = 'assets',
     },
     keys = {
       -- suggested keymap
       { '<leader>p', '<cmd>PasteImage<cr>', desc = 'Paste image from system clipboard' },
+    },
+  },
+  {
+    'nvim-neotest/neotest',
+    dependencies = {
+      'nvim-neotest/nvim-nio',
+      'nvim-lua/plenary.nvim',
+      'antoinemadec/FixCursorHold.nvim',
+      'nvim-treesitter/nvim-treesitter',
+      'nvim-neotest/neotest-python',
+    },
+    config = function()
+      require('neotest').setup {
+        adapters = {
+          require 'neotest-python',
+        },
+      }
+    end,
+  },
+  {
+    '3rd/image.nvim',
+    config = function()
+      require('image').setup {
+        backend = 'kitty',
+        processor = 'magick_rock', -- or "magick_cli"
+        integrations = {
+          markdown = {
+            enabled = true,
+            clear_in_insert_mode = false,
+            download_remote_images = true,
+            only_render_image_at_cursor = false,
+            floating_windows = false, -- if true, images will be rendered in floating markdown windows
+            filetypes = { 'markdown', 'vimwiki' }, -- markdown extensions (ie. quarto) can go here
+          },
+          neorg = {
+            enabled = true,
+            filetypes = { 'norg' },
+          },
+          typst = {
+            enabled = true,
+            filetypes = { 'typst' },
+          },
+          html = {
+            enabled = false,
+          },
+          css = {
+            enabled = false,
+          },
+        },
+        max_width = nil,
+        max_height = nil,
+        max_width_window_percentage = nil,
+        max_height_window_percentage = 50,
+        window_overlap_clear_enabled = false, -- toggles images when windows are overlapped
+        window_overlap_clear_ft_ignore = { 'cmp_menu', 'cmp_docs', 'snacks_notif', 'scrollview', 'scrollview_sign' },
+        editor_only_render_when_focused = false, -- auto show/hide images when the editor gains/looses focus
+        tmux_show_only_in_active_window = false, -- auto show/hide images in the correct Tmux window (needs visual-activity off)
+        hijack_file_patterns = { '*.png', '*.jpg', '*.jpeg', '*.gif', '*.webp', '*.avif' }, -- render image files as images when opened
+      }
+    end,
+  },
+  {
+    'Thiago4532/mdmath.nvim',
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter',
     },
   },
   --
