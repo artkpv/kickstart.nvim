@@ -163,11 +163,15 @@ return {
       vim.opt.list = false
       vim.opt.foldlevel = 2
       vim.diagnostic.enable(false)
-      vim.cmd.colorscheme 'neobones'
+
       vim.o.laststatus = 1
       vim.o.ruler = false
       vim.cmd 'Copilot disable'
       vim.cmd 'LspStop'
+
+      vim.g.randombones = { transparent_background = true }
+      vim.o.background = 'dark'
+      vim.cmd.colorscheme 'randombones'
 
       -- au! BufWritePost ~/mydir/notes/* !git add "%";git commit -m "Auto commit of %:t." "%"
 
