@@ -128,6 +128,13 @@ vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right win
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
+vim.keymap.set('n', '<leader>haa', function()
+  vim.cmd ':!git aa; git cm save'
+end, { desc = 'Git add all and commit' })
+vim.keymap.set('n', '<leader>has', function()
+  vim.cmd ':!git save'
+end, { desc = 'Git add all, commit, and push' })
+
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 
@@ -1023,19 +1030,20 @@ require('lazy').setup({
       return opts
     end,
   },
-  {
-    'MeanderingProgrammer/render-markdown.nvim',
-    dependencies = { 'nvim-treesitter/nvim-treesitter', 'echasnovski/mini.nvim' }, -- if you use the mini.nvim suite
-    ---@module 'render-markdown'
-    ---@type render.md.UserConfig
-    opts = {
+  -- TODO: Broke with error executing vim.schedule lua callback: ...er-markdown.nvim/lua/render-markdown/render/html_tag.lua:10: attempt to call method 'child'
+  -- {
+  --   'MeanderingProgrammer/render-markdown.nvim',
+  --   dependencies = { 'nvim-treesitter/nvim-treesitter', 'echasnovski/mini.nvim' }, -- if you use the mini.nvim suite
+  --   ---@module 'render-markdown'
+  --   ---@type render.md.UserConfig
+  --   opts = {
 
-      latex = {
-        -- Whether LaTeX should be rendered, mainly used for health check
-        enabled = false,
-      },
-    },
-  },
+  --     latex = {
+  --       -- Whether LaTeX should be rendered, mainly used for health check
+  --       enabled = false,
+  --     },
+  --   },
+  -- },
   {
     'jalvesaq/zotcite',
     -- branch = 'check_ft',
@@ -1124,7 +1132,7 @@ require('lazy').setup({
     priority = 1000,
     -- you can set set configuration options here
     config = function()
-      vim.g.randombones = { transparent_background = true }
+      vim.g.forestbones = { transparent_background = true }
     end,
   },
   {

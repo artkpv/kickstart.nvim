@@ -169,9 +169,9 @@ return {
       vim.cmd 'Copilot disable'
       vim.cmd 'LspStop'
 
-      vim.g.randombones = { transparent_background = true }
+      vim.g.duckbones = { transparent_background = true }
       vim.o.background = 'dark'
-      vim.cmd.colorscheme 'randombones'
+      vim.cmd.colorscheme 'forestbones'
 
       -- au! BufWritePost ~/mydir/notes/* !git add "%";git commit -m "Auto commit of %:t." "%"
 
