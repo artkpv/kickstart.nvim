@@ -166,8 +166,8 @@ return {
 
       vim.o.laststatus = 1
       vim.o.ruler = false
-      vim.cmd 'Copilot disable'
-      vim.cmd 'LspStop'
+      -- vim.cmd 'Copilot disable'
+      -- vim.cmd 'LspStop'
 
       vim.g.duckbones = { transparent_background = true }
       vim.o.background = 'dark'
@@ -204,6 +204,7 @@ return {
     end
 
     vim.keymap.set('n', '<leader>wpr', wiki_page_rename, { desc = 'Rename wiki page' })
+    vim.keymap.set('n', '<leader>wt', '<cmd>WikiTags<CR>', { desc = 'Wiki [t]ags' })
 
     vim.keymap.set('n', ',wln', CreateHeaderLink, {
       noremap = true,

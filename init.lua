@@ -1,8 +1,3 @@
---
--- TODO: Finish migrate
--- * Snippets
--- * Tmux integration
-
 -- Set <space> as the leader key
 -- See `:help mapleader`
 --  NOTE: Must happen before plugins are loaded (otherwise wrong leader will be used)
@@ -80,8 +75,11 @@ vim.opt.wrap = true
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
 
--- Save on buffer change
-vim.g.autowrite = 1
+-- Save on buffer change and exit (built-in autosave)
+vim.opt.autowriteall = true
+
+-- Quick save with Ctrl-S
+vim.keymap.set({ 'n', 'i', 'x' }, '<C-s>', '<cmd>w<cr><esc>', { desc = 'Save file' })
 
 -- [[ Basic Keymaps ]]
 --  See `:help vim.keymap.set()`
@@ -128,12 +126,29 @@ vim.keymap.set('n', '<C-l>', '<C-w><C-l>', { desc = 'Move focus to the right win
 vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower window' })
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
+-- Open current buffer in a new tab:
+vim.keymap.set('n', '<C-w>t', ':tab split<CR>', { noremap = true, silent = true })
+
 vim.keymap.set('n', '<leader>haa', function()
   vim.cmd ':!git aa; git cm save'
 end, { desc = 'Git add all and commit' })
 vim.keymap.set('n', '<leader>has', function()
   vim.cmd ':!git save'
 end, { desc = 'Git add all, commit, and push' })
+
+-- Copy relative path:line (e.g., src/main.py:10)
+vim.keymap.set('n', '<leader>cp', function()
+  local path = vim.fn.expand '%' .. ':' .. vim.fn.line '.'
+  vim.fn.setreg('+', path)
+  vim.notify('Copied "' .. path .. '" to clipboard')
+end, { desc = 'Copy relative path:line' })
+
+-- Copy full path:line (e.g., /home/user/project/src/main.py:10)
+vim.keymap.set('n', '<leader>cP', function()
+  local path = vim.fn.expand '%:p' .. ':' .. vim.fn.line '.'
+  vim.fn.setreg('+', path)
+  vim.notify('Copied "' .. path .. '" to clipboard')
+end, { desc = 'Copy full path:line' })
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
@@ -150,13 +165,16 @@ vim.api.nvim_create_autocmd('TextYankPost', {
 })
 
 -- Auto save when buffer lose focus
-vim.api.nvim_create_autocmd('BufLeave', {
-  desc = 'Save buffer if the buffer loses focus.',
-  pattern = '*',
-  callback = function()
-    vim.cmd 'silent! wa'
-  end,
-})
+-- vim.api.nvim_create_autocmd('BufLeave', {
+--   desc = 'Save buffer if the buffer loses focus.',
+--   pattern = '*',
+--   callback = function()
+--     vim.cmd 'silent! wa'
+--   end,
+-- })
+
+-- Fix the bug (2025-10-11), where `s` does not work
+vim.keymap.set({ 'n', 'x' }, 's', 'cl')
 
 -- [[ Install `lazy.nvim` plugin manager ]]
 --    See `:help lazy.nvim.txt` or https://github.com/folke/lazy.nvim for more info
@@ -680,7 +698,7 @@ require('lazy').setup({
       formatters_by_ft = {
         lua = { 'stylua' },
         -- Conform can also run multiple formatters sequentially
-        python = { 'isort', 'black' },
+        -- python = { 'isort', 'black' },
         --
         -- You can use 'stop_after_first' to run the first available formatter from the list
         -- javascript = { "prettierd", "prettier", stop_after_first = true },
@@ -718,7 +736,9 @@ require('lazy').setup({
         },
         config = function()
           require('luasnip.loaders.from_snipmate').lazy_load {
-            paths = { '/home/art/mydir/notes/bin/snippets' },
+            paths = {
+              '/home/art/mydir/notes/bin/snippets',
+            },
           }
         end,
       },
@@ -851,7 +871,11 @@ require('lazy').setup({
       -- - sr)'  - [S]urround [R]eplace [)] [']
       require('mini.surround').setup()
 
-      require('mini.git').setup()
+      require('mini.git').setup {
+        vim.keymap.set({ 'n', 'x' }, '<Leader>gs', '<Cmd>lua MiniGit.show_at_cursor()<CR>', { desc = '[g]it, [s]how at cursor' }),
+        vim.keymap.set({ 'n', 'x' }, '<Leader>gr', '<Cmd>lua MiniGit.show_range_history()<CR>', { desc = '[g]it, show [r]ange history' }),
+        vim.keymap.set({ 'n', 'x' }, '<Leader>gd', '<Cmd>lua MiniGit.show_diff_source()<CR>', { desc = '[g]it, shows file state as it was at [d]iff entry' }),
+      }
 
       require('mini.basics').setup {
         mappings = {
@@ -877,6 +901,23 @@ require('lazy').setup({
       ---@diagnostic disable-next-line: duplicate-set-field
       statusline.section_location = function()
         return '%2l:%-2v'
+      end
+
+      -- Show markdown title in statusline
+      ---@diagnostic disable-next-line: duplicate-set-field
+      local old_filename = statusline.section_filename
+      statusline.section_filename = function(args)
+        if vim.bo.filetype == 'markdown' then
+          local lines = vim.api.nvim_buf_get_lines(0, 0, 10, false)
+          for _, line in ipairs(lines) do
+            -- Match headers starting with # and space
+            if line:match '^#%s+' then
+              -- Return the header content trimmed
+              return line:gsub('^#%s+', ''):gsub('^%s+', ''):gsub('%s+$', '')
+            end
+          end
+        end
+        return old_filename(args)
       end
 
       -- require('mini.tabline').setup()
@@ -977,22 +1018,37 @@ require('lazy').setup({
       }
     end,
   },
-  {
-    'github/copilot.vim',
-    config = function()
-      vim.keymap.set('i', '<C-y>', 'copilot#Accept("\\<CR>")', {
-        expr = true,
-        replace_keycodes = false,
-      })
-      vim.keymap.set('i', '<C-f>', '<Plug>(copilot-next)')
-      vim.keymap.set('i', '<C-b>', '<Plug>(copilot-previous)')
-      vim.keymap.set('i', '<C-g>', '<Plug>(copilot-suggest)')
-      vim.keymap.set('i', '<C-Right>', '<Plug>(copilot-accept-word)')
+  -- TODO: Disable by default
+  -- {
+  --   'github/copilot.vim',
+  --   -- event = 'InsertEnter',
+  --   -- opts = {
+  --   --   panel = {
+  --   --     enabled = false,
+  --   --   },
+  --   --   suggestion = {
+  --   --     auto_trigger = true,
+  --   --     hide_during_completion = false,
+  --   --     keymap = {
+  --   --       accept = '<Tab>',
+  --   --     },
+  --   --   },
+  --   -- },
+  --   config = function()
+  --     vim.cmd 'Copilot disable'
+  --     vim.g.copilot_settings = { selectedCompletionModel = 'claude-sonnet-4' }
+  --     vim.keymap.set('i', '<C-y>', 'copilot#Accept("\\<CR>")', {
+  --       expr = true,
+  --       replace_keycodes = false,
+  --     })
+  --     vim.keymap.set('i', '<C-f>', '<Plug>(copilot-next)')
+  --     vim.keymap.set('i', '<C-b>', '<Plug>(copilot-previous)')
+  --     vim.keymap.set('i', '<C-g>', '<Plug>(copilot-suggest)')
+  --     vim.keymap.set('i', '<C-Right>', '<Plug>(copilot-accept-word)')
 
-      vim.g.copilot_no_tab_map = true
-      vim.cmd 'Copilot disable'
-    end,
-  },
+  --     vim.g.copilot_no_tab_map = true
+  --   end,
+  -- },
   -- {
   --   'Exafunction/codeium.vim',
   --   config = function()
@@ -1019,10 +1075,10 @@ require('lazy').setup({
       'godlygeek/tabular',
     },
     init = function(opts)
-      vim.keymap.set('n', '<leader>m\\', '<cmd>WikiToc<CR>')
       vim.keymap.set({ 'n', 'v' }, '<leader>mi', "<cmd>'<,'>HeaderIncrease<CR>")
       vim.keymap.set({ 'n', 'v' }, '<leader>md', "<cmd>'<,'>HeaderDecrease<CR>")
       vim.keymap.set({ 'n', 'v' }, '<leader>mh', '<cmd>norm I#<CR>')
+      vim.keymap.set({ 'n', 'v' }, '<leader>mo', '<cmd>Toc<CR>')
 
       vim.keymap.set('n', '<leader>mf', function()
         vim.cmd ':!firefox --new-window "%"&'
@@ -1031,19 +1087,21 @@ require('lazy').setup({
     end,
   },
   -- TODO: Broke with error executing vim.schedule lua callback: ...er-markdown.nvim/lua/render-markdown/render/html_tag.lua:10: attempt to call method 'child'
-  -- {
-  --   'MeanderingProgrammer/render-markdown.nvim',
-  --   dependencies = { 'nvim-treesitter/nvim-treesitter', 'echasnovski/mini.nvim' }, -- if you use the mini.nvim suite
-  --   ---@module 'render-markdown'
-  --   ---@type render.md.UserConfig
-  --   opts = {
+  {
+    'MeanderingProgrammer/render-markdown.nvim',
+    dependencies = { 'nvim-treesitter/nvim-treesitter', 'echasnovski/mini.nvim' }, -- if you use the mini.nvim suite
+    ---@module 'render-markdown'
+    ---@type render.md.UserConfig
+    opts = {
 
-  --     latex = {
-  --       -- Whether LaTeX should be rendered, mainly used for health check
-  --       enabled = false,
-  --     },
-  --   },
-  -- },
+      latex = {
+        -- Whether LaTeX should be rendered, mainly used for health check
+        enabled = false,
+      },
+      file_types = { 'markdown', 'Avante' },
+    },
+    ft = { 'markdown', 'Avante' },
+  },
   {
     'jalvesaq/zotcite',
     -- branch = 'check_ft',
@@ -1054,6 +1112,11 @@ require('lazy').setup({
     config = function()
       require('zotcite').setup {
         -- your options here (see doc/zotcite.txt)
+        --
+        open_in_zotero = true,
+        key_type = 'zotero',
+        -- citation_template = '',
+        citation_template = '{Author}-{year}',
       }
     end,
   },
@@ -1066,46 +1129,114 @@ require('lazy').setup({
       'nvim-tree/nvim-web-devicons',
     },
   },
-  {
-    'olimorris/codecompanion.nvim',
-    dependencies = {
-      'nvim-lua/plenary.nvim',
-      'nvim-treesitter/nvim-treesitter',
-      -- The following are optional:
-      { 'MeanderingProgrammer/render-markdown.nvim', ft = { 'markdown', 'codecompanion' } },
-    },
-    config = function()
-      require('codecompanion').setup {
-        strategies = {
-          chat = {
-            adapter = 'anthropic',
-          },
-          inline = {
-            adapter = 'anthropic',
-          },
-        },
-        adapters = {
-          anthropic = function()
-            return require('codecompanion.adapters').extend('anthropic', {
-              env = {
-                -- Get the key from environment variable ANTHROPIC_API_KEY
-                api_key = os.getenv 'ANTHROPIC_API_KEY',
-              },
-            })
-          end,
-        },
-      }
-
-      vim.api.nvim_set_keymap('n', '<C-a>', '<cmd>CodeCompanionActions<cr>', { noremap = true, silent = true })
-      vim.api.nvim_set_keymap('v', '<C-a>', '<cmd>CodeCompanionActions<cr>', { noremap = true, silent = true })
-      vim.api.nvim_set_keymap('n', '<LocalLeader>a', '<cmd>CodeCompanionChat Toggle<cr>', { noremap = true, silent = true })
-      vim.api.nvim_set_keymap('v', '<LocalLeader>a', '<cmd>CodeCompanionChat Toggle<cr>', { noremap = true, silent = true })
-      vim.api.nvim_set_keymap('v', 'ga', '<cmd>CodeCompanionChat Add<cr>', { noremap = true, silent = true })
-
-      -- Expand 'cc' into 'CodeCompanion' in the command line
-      vim.cmd [[cab cc CodeCompanion]]
-    end,
-  },
+  -- TODO: THis loads Copilot which is blocked in Russia, which results in an error
+  -- {
+  --   'yetone/avante.nvim',
+  --   -- if you want to build from source then do `make BUILD_FROM_SOURCE=true`
+  --   -- ⚠️ must add this setting! ! !
+  --   build = vim.fn.has 'win32' ~= 0 and 'powershell -ExecutionPolicy Bypass -File Build.ps1 -BuildFromSource false' or 'make',
+  --   event = 'VeryLazy',
+  --   version = false, -- Never set this value to "*"! Never!
+  --   ---@module 'avante'
+  --   ---@type avante.Config
+  --   opts = {
+  --     -- add any opts here
+  --     mode = 'agentic',
+  --     -- this file can contain specific instructions for your project
+  --     instructions_file = 'avante.md',
+  --     -- for example
+  --     provider = 'claude',
+  --     providers = {
+  --       ['claude-opus'] = {
+  --         endpoint = 'https://api.anthropic.com',
+  --         -- model = 'claude-sonnet-4-20250514',
+  --         model = 'claude-opus-4-1-20250805',
+  --         timeout = 30000, -- Timeout in milliseconds
+  --         extra_request_body = {
+  --           temperature = 0.75,
+  --           max_tokens = 20480,
+  --         },
+  --       },
+  --       claude = {
+  --         endpoint = 'https://api.anthropic.com',
+  --         model = 'claude-sonnet-4-20250514',
+  --         --model = 'claude-opus-4-1-20250805',
+  --         timeout = 30000, -- Timeout in milliseconds
+  --         extra_request_body = {
+  --           temperature = 0.75,
+  --           max_tokens = 20480,
+  --         },
+  --       },
+  --     },
+  --     -- mappings = {
+  --     --   suggestion = {
+  --     --     accept = '<C-a>',
+  --     --     next = '<C-f>',
+  --     --     prev = '<C-b>',
+  --     --     dismiss = '<C-d>',
+  --     --   },
+  --     -- },
+  --   },
+  --   dependencies = {
+  --     'nvim-lua/plenary.nvim',
+  --     'MunifTanjim/nui.nvim',
+  --     --- The below dependencies are optional,
+  --     'echasnovski/mini.pick', -- for file_selector provider mini.pick
+  --     'nvim-telescope/telescope.nvim', -- for file_selector provider telescope
+  --     'hrsh7th/nvim-cmp', -- autocompletion for avante commands and mentions
+  --     'ibhagwan/fzf-lua', -- for file_selector provider fzf
+  --     'stevearc/dressing.nvim', -- for input provider dressing
+  --     'folke/snacks.nvim', -- for input provider snacks
+  --     'nvim-tree/nvim-web-devicons', -- or echasnovski/mini.icons
+  --     -- 'zbirenbaum/copilot.lua', -- for providers='copilot'
+  --     {
+  --       'HakonHarnes/img-clip.nvim',
+  --     },
+  --     {
+  --       'MeanderingProgrammer/render-markdown.nvim',
+  --     },
+  --   },
+  -- },
+  -- {
+  --   'olimorris/codecompanion.nvim',
+  --   dependencies = {
+  --     'nvim-lua/plenary.nvim',
+  --     'nvim-treesitter/nvim-treesitter',
+  --     -- The following are optional:
+  --     { 'MeanderingProgrammer/render-markdown.nvim', ft = { 'markdown', 'codecompanion' } },
+  --   },
+  --   config = function()
+  --     require('codecompanion').setup {
+  --       strategies = {
+  --         chat = {
+  --           adapter = 'anthropic',
+  --         },
+  --         inline = {
+  --           adapter = 'anthropic',
+  --         },
+  --       },
+  --       adapters = {
+  --         anthropic = function()
+  --           return require('codecompanion.adapters').extend('anthropic', {
+  --             env = {
+  --               -- Get the key from environment variable ANTHROPIC_API_KEY
+  --               api_key = os.getenv 'ANTHROPIC_API_KEY',
+  --             },
+  --           })
+  --         end,
+  --       },
+  --     }
+  --
+  --     vim.api.nvim_set_keymap('n', '<C-a>', '<cmd>CodeCompanionActions<cr>', { noremap = true, silent = true })
+  --     vim.api.nvim_set_keymap('v', '<C-a>', '<cmd>CodeCompanionActions<cr>', { noremap = true, silent = true })
+  --     vim.api.nvim_set_keymap('n', '<LocalLeader>a', '<cmd>CodeCompanionChat Toggle<cr>', { noremap = true, silent = true })
+  --     vim.api.nvim_set_keymap('v', '<LocalLeader>a', '<cmd>CodeCompanionChat Toggle<cr>', { noremap = true, silent = true })
+  --     vim.api.nvim_set_keymap('v', 'ga', '<cmd>CodeCompanionChat Add<cr>', { noremap = true, silent = true })
+  --
+  --     -- Expand 'cc' into 'CodeCompanion' in the command line
+  --     vim.cmd [[cab cc CodeCompanion]]
+  --   end,
+  -- },
   {
     'folke/zen-mode.nvim',
     opts = {
@@ -1177,7 +1308,16 @@ require('lazy').setup({
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   -- { import = 'custom.plugins' },
 
-  require 'custom.plugins.wiki_vim',
+  --- require 'custom.plugins.wiki_vim',
+  --- {  -- Does not work with my links
+  ---   'renerocksai/telekasten.nvim',
+  ---   dependencies = { 'nvim-telescope/telescope.nvim' },
+  ---   config = function()
+  ---     require('telekasten').setup {
+  ---       home = vim.fn.expand '~/mydir/notes', -- Put the name of your notes directory here
+  ---     }
+  ---   end,
+  --- },
   {
     'HakonHarnes/img-clip.nvim',
     event = 'VeryLazy',
@@ -1185,6 +1325,8 @@ require('lazy').setup({
       -- add options here
       -- or leave it empty to use the default settings
       --
+      prompt_for_file_name = true,
+      embed_image_as_base64 = false,
       dir_path = 'assets',
     },
     keys = {
@@ -1256,6 +1398,86 @@ require('lazy').setup({
     dependencies = {
       'nvim-treesitter/nvim-treesitter',
     },
+  },
+  {
+    'nvim-neotest/neotest',
+    dependencies = {
+      'nvim-neotest/nvim-nio',
+      'nvim-lua/plenary.nvim',
+      'antoinemadec/FixCursorHold.nvim',
+      'nvim-treesitter/nvim-treesitter',
+    },
+  },
+  -- {
+  --   'bngarren/checkmate.nvim',
+  --   ft = 'markdown', -- Lazy loads for Markdown files matching patterns in 'files'
+  --   opts = {
+  --     -- your configuration here
+  --     -- or leave empty to use defaults
+  --     files = { '*.md' },
+  --   },
+  -- },
+  {
+    'zk-org/zk-nvim',
+    config = function()
+      require('zk').setup {
+
+        -- Can be "telescope", "fzf", "fzf_lua", "minipick", "snacks_picker",
+        -- or select" (`vim.ui.select`).
+        picker = 'telescope',
+
+        lsp = {
+          -- `config` is passed to `vim.lsp.start(config)`
+          config = {
+            name = 'zk',
+            cmd = { 'zk', 'lsp' },
+            filetypes = { 'markdown' },
+            -- on_attach = ...
+            -- etc, see `:h vim.lsp.start()`
+          },
+
+          -- automatically attach buffers in a zk notebook that match the given filetypes
+          auto_attach = {
+            enabled = true,
+          },
+        },
+      }
+
+      -- HOTFIX: Patch zk.util to avoid crash on recent Neovim versions
+      -- Issue: "s: expected string, got nil" in make_given_range_params
+      local util = require 'zk.util'
+
+      util.get_lsp_location_from_selection = function()
+        local bufnr = vim.api.nvim_get_current_buf()
+        local encoding = 'utf-16'
+        local client = vim.lsp.get_clients({ bufnr = bufnr, name = 'zk' })[1]
+        if client and client.offset_encoding then
+          encoding = client.offset_encoding
+        end
+
+        local params = vim.lsp.util.make_given_range_params(nil, nil, bufnr, encoding)
+        return {
+          uri = params.textDocument.uri,
+          range = params.range,
+        }
+      end
+
+      util.get_lsp_location_from_caret = function()
+        local bufnr = vim.api.nvim_get_current_buf()
+        local uri = vim.uri_from_bufnr(bufnr)
+        local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+
+        -- Manual construction of range to avoid make_range_zk overhead/issues
+        -- Logic matches original fix_cursor_location: line - 1, char + 1
+        return {
+          uri = uri,
+          range = {
+            start = { line = row - 1, character = col + 1 },
+            ['end'] = { line = row - 1, character = col + 1 },
+          },
+        }
+      end
+    end,
   },
   --
   -- For additional information with loading, sourcing and examples see `:help lazy.nvim-🔌-plugin-spec`
