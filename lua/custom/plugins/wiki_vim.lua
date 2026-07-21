@@ -170,7 +170,7 @@ return {
       -- vim.cmd 'LspStop'
 
       vim.g.duckbones = { transparent_background = true }
-      vim.o.background = 'dark'
+      vim.o.background = 'light'
       vim.cmd.colorscheme 'forestbones'
 
       -- au! BufWritePost ~/mydir/notes/* !git add "%";git commit -m "Auto commit of %:t." "%"

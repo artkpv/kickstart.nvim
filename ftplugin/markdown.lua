@@ -1,5 +1,8 @@
 -- Add the key mappings only for Markdown files in a zk notebook.
-if require('zk.util').notebook_root(vim.fn.expand '%:p') ~= nil then
+local has_zk, zk_util = pcall(require, 'zk.util')
+if not has_zk then return end
+
+if zk_util.notebook_root(vim.fn.expand '%:p') ~= nil then
   local function map(...)
     vim.api.nvim_buf_set_keymap(0, ...)
   end
@@ -70,6 +73,6 @@ if require('zk.util').notebook_root(vim.fn.expand '%:p') ~= nil then
   vim.o.ruler = false
 
   vim.g.duckbones = { transparent_background = true }
-  vim.o.background = 'dark'
+  vim.o.background = 'light'
   vim.cmd.colorscheme 'forestbones'
 end
